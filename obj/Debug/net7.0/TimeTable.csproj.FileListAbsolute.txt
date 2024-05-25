@@ -74,3 +74,4 @@ D:\Projects\TimeTable\TimeTable\bin\Debug\net7.0\Swashbuckle.AspNetCore.SwaggerG
 D:\Projects\TimeTable\TimeTable\bin\Debug\net7.0\Swashbuckle.AspNetCore.SwaggerUI.dll
 D:\Projects\TimeTable\TimeTable\obj\Debug\net7.0\TimeTable.MvcApplicationPartsAssemblyInfo.cs
 D:\Projects\TimeTable\TimeTable\bin\Debug\net7.0\Newtonsoft.Json.dll
+D:\Projects\TimeTable\TimeTable\obj\Debug\net7.0\TimeTable.sourcelink.json
