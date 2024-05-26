@@ -105,33 +105,21 @@ public class TimeTableContext : DbContext
             new(17, 0, 0)
         };
 
+        // Seed data for Setting
         modelBuilder.Entity<Setting>().HasData(
             new Setting
             {
-                // 2 day
                 SettingId = 1,
+                Type = "2-day",
                 Duration = new TimeSpan(1, 15, 0),
-                SpecificStartTimesJson = JsonConvert.SerializeObject(new Dictionary<int, List<TimeSpan>>
-                {
-                    { 1, twoDay },
-                    { 2, twoDay },
-                    { 3, twoDay },
-                    { 4, twoDay },
-                })
+                SpecificStartTimesJson = JsonConvert.SerializeObject(twoDay)
             },
             new Setting
             {
-                // one day
                 SettingId = 2,
+                Type = "1-day",
                 Duration = new TimeSpan(2, 15, 0),
-                SpecificStartTimesJson = JsonConvert.SerializeObject(new Dictionary<int, List<TimeSpan>>
-                {
-                    { 1, oneDay },
-                    { 2, oneDay },
-                    { 3, oneDay },
-                    { 4, oneDay },
-                    { 5, oneDay },
-                })
+                SpecificStartTimesJson = JsonConvert.SerializeObject(oneDay)
             }
         );
 

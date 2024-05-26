@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace TimeTable.Core.Models
@@ -10,10 +11,8 @@ namespace TimeTable.Core.Models
         public int SlotId { get; set; }
 
         [Required]
-        public int Day { get; set; }
-
-        [Required]
         public DateTime StartTime { get; set; }
+
         public DateTime EndTime => StartTime.Add(Duration);
 
         [Required]
@@ -22,22 +21,26 @@ namespace TimeTable.Core.Models
         // Foreign key properties
         [Required]
         public int TeacherId { get; set; }
+
         [ForeignKey("TeacherId")]
-        public Teacher Teacher { get; set; }
+        public Teacher Teacher { get; set; } = null!;
 
         [Required]
         public int RoomId { get; set; }
+
         [ForeignKey("RoomId")]
-        public Room Room { get; set; }
+        public Room Room { get; set; } = null!;
 
         [Required]
         public int SubjectId { get; set; }
+
         [ForeignKey("SubjectId")]
-        public Subject Subject { get; set; }
+        public Subject Subject { get; set; } = null!;
 
         [Required]
         public int TimeTableId { get; set; }
+
         [ForeignKey("TimeTableId")]
-        public TimeTable TimeTable { get; set; }
+        public TimeTable TimeTable { get; set; } = null!;
     }
 }

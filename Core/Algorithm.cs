@@ -2,8 +2,8 @@
 using TimeTable.Core.Models;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
-using TimeTable.Core.Dto;
 
 namespace TimeTable.Core
 {
@@ -19,40 +19,14 @@ namespace TimeTable.Core
 
             for (var i = 0; i < populationSize; i++)
             {
-                var timetable = GenerateTimetable(subjects, rooms, teachers, students);
+                var timetable = GenerateMaximallyPopulatedTimetable(subjects, rooms, teachers, students);
                 population.Add(timetable);
             }
 
             return population;
         }
 
-        private bool IsTeacherAvailable(Teacher teacher, DayOfWeek day, DateTime slotStartTime, TimeSpan duration)
-        {
-            var slotEndTime = slotStartTime.Add(duration);
-
-            return teacher.AvailabilityRules
-                .Where(rule => rule.Day == day)
-                .All(rule =>
-                {
-                    var ruleStartTime = slotStartTime.Date.Add(rule.StartTime);
-                    var ruleEndTime = slotStartTime.Date.Add(rule.EndTime);
-                    return slotEndTime <= ruleStartTime || slotStartTime >= ruleEndTime;
-                });
-        }
-
-        private bool IsRoomAvailable(Room room, DayOfWeek day, DateTime slotStartTime, TimeSpan duration,
-            Schedule timetable)
-        {
-            var slotEndTime = slotStartTime.Add(duration);
-
-            return !timetable.Slots.Any(slot =>
-                slot.Room == room && slot.Day == (int)day &&
-                ((slot.StartTime < slotEndTime && slot.StartTime >= slotStartTime) ||
-                 (slot.EndTime > slotStartTime && slot.EndTime <= slotEndTime) ||
-                 (slot.StartTime <= slotStartTime && slot.EndTime >= slotEndTime)));
-        }
-
-        private Schedule GenerateTimetable(List<Subject> subjects, List<Room> rooms,
+        private Schedule GenerateMaximallyPopulatedTimetable(List<Subject> subjects, List<Room> rooms,
             List<Teacher> teachers, List<Student> students)
         {
             var timetable = new Schedule { Slots = new List<Slot>() };
@@ -64,54 +38,97 @@ namespace TimeTable.Core
 
             ValidateRoomAvailability(subjects, rooms);
 
-            var today = DateTime.Today;
-            var startOfWeek = today.AddDays(-(int)today.DayOfWeek + (int)DayOfWeek.Monday);
+            var startOfSemester = Semester.StartDate;
+            var endOfSemester = Semester.EndDate;
             var subjectSlotCounts = subjects.ToDictionary(s => s.SubjectId, s => 0);
 
+            // Shuffle the subjects to ensure a more random distribution
             subjects = subjects.OrderBy(s => _random.Next()).ToList();
 
-            foreach (var day in Enum.GetValues(typeof(DayOfWeek)).Cast<DayOfWeek>())
+            // Ensure every week within the semester has slots
+            for (var currentDate = startOfSemester; currentDate <= endOfSemester; currentDate = currentDate.AddDays(1))
             {
-                if (day == DayOfWeek.Saturday || day == DayOfWeek.Sunday) continue;
+                var dayOfWeek = currentDate.DayOfWeek;
 
-                foreach (var subject in subjects)
+                if (dayOfWeek != DayOfWeek.Saturday && dayOfWeek != DayOfWeek.Sunday)
                 {
-                    if (!subject.Setting.SpecificStartTimes.ContainsKey((int)day)) continue;
-
-                    var startTimes = subject.Setting.SpecificStartTimes[(int)day];
-
-                    foreach (var startTime in startTimes)
+                    foreach (var subject in subjects)
                     {
-                        var slotStartTime = startOfWeek.AddDays((int)day - 1).Add(startTime);
-                        var slotEndTime = slotStartTime.Add(subject.Setting.Duration);
+                        if (!subject.Setting.SpecificStartTimes.Any()) continue;
 
-                        var room = FindAvailableRoom(subject, rooms);
-                        var teacher = FindAvailableTeacher(subject, teachers, day, slotStartTime, timetable);
+                        var startTimes = subject.Setting.SpecificStartTimes;
 
-                        if (room != null && teacher != null && IsRoomAvailable(room, day, slotStartTime, subject.Setting.Duration, timetable))
+                        foreach (var startTime in startTimes)
                         {
-                            if (IsSlotValid(subject, day, slotStartTime, slotEndTime, timetable))
-                            {
-                                var slot = new Slot
-                                {
-                                    Subject = subject,
-                                    Room = room,
-                                    Teacher = teacher,
-                                    Day = (int)day,
-                                    StartTime = slotStartTime,
-                                    Duration = subject.Setting.Duration
-                                };
+                            var slotStartTime = currentDate.Date.Add(startTime);
+                            var slotEndTime = slotStartTime.Add(subject.Setting.Duration);
 
-                                timetable.Slots.Add(slot);
-                                subjectSlotCounts[subject.SubjectId]++;
-                                LogSlotAdded(subject, day, startTime, teacher, room);
+                            if (IsCourseDuplicatedInSameWeek(subject, timetable, slotStartTime))
+                            {
+                                continue;
+                            }
+
+                            if (IsCourseDuplicatedOnSameDay(subject, timetable, slotStartTime))
+                            {
+                                continue;
+                            }
+
+                            var room = FindAvailableRoom(subject, rooms);
+                            var teacher = FindAvailableTeacher(subject, teachers, slotStartTime, timetable);
+
+                            if (room != null && teacher != null && IsRoomAvailable(room, slotStartTime, subject.Setting.Duration, timetable))
+                            {
+                                if (IsSlotValid(subject, slotStartTime, slotEndTime, timetable))
+                                {
+                                    var slot = new Slot
+                                    {
+                                        Subject = subject,
+                                        Room = room,
+                                        Teacher = teacher,
+                                        StartTime = slotStartTime,
+                                        Duration = subject.Setting.Duration
+                                    };
+
+                                    timetable.Slots.Add(slot);
+                                    subjectSlotCounts[subject.SubjectId]++;
+
+                                    // Handle 2-day courses
+                                    if (subject.Setting.Type == "2-day" && (dayOfWeek == DayOfWeek.Monday || dayOfWeek == DayOfWeek.Tuesday))
+                                    {
+                                        var oppositeDay = GetOppositeDay(dayOfWeek);
+                                        if (oppositeDay != null)
+                                        {
+                                            var oppositeSlotStartTime = slotStartTime.AddDays((int)oppositeDay - (int)dayOfWeek);
+                                            var oppositeSlotEndTime = oppositeSlotStartTime.Add(subject.Setting.Duration);
+
+                                            if (!IsCourseDuplicatedOnSameDay(subject, timetable, oppositeSlotStartTime) &&
+                                                IsRoomAvailable(room, oppositeSlotStartTime, subject.Setting.Duration, timetable) &&
+                                                IsTeacherAvailable(teacher, oppositeSlotStartTime, subject.Setting.Duration, timetable))
+                                            {
+                                                var oppositeSlot = new Slot
+                                                {
+                                                    Subject = subject,
+                                                    Room = room,
+                                                    Teacher = teacher,
+                                                    StartTime = oppositeSlotStartTime,
+                                                    Duration = subject.Setting.Duration
+                                                };
+
+                                                timetable.Slots.Add(oppositeSlot);
+                                                subjectSlotCounts[subject.SubjectId]++;
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
-                        else
-                        {
-                            LogNoSuitableRoomOrTeacher(subject, day, startTime, room, teacher);
-                        }
                     }
+                }
+
+                // Skip to Monday if the current date is Friday
+                if (currentDate.DayOfWeek == DayOfWeek.Friday)
+                {
+                    currentDate = currentDate.AddDays(2);
                 }
             }
 
@@ -119,13 +136,31 @@ namespace TimeTable.Core
             return timetable;
         }
 
+        private bool IsCourseDuplicatedInSameWeek(Subject subject, Schedule timetable, DateTime slotStartTime)
+        {
+            var weekStart = slotStartTime.AddDays(-(int)slotStartTime.DayOfWeek + (int)DayOfWeek.Monday);
+            var weekEnd = weekStart.AddDays(6);
+
+            return timetable.Slots.Any(slot =>
+                slot.Subject == subject &&
+                slot.StartTime >= weekStart &&
+                slot.StartTime <= weekEnd);
+        }
+
+        private bool IsCourseDuplicatedOnSameDay(Subject subject, Schedule timetable, DateTime slotStartTime)
+        {
+            return timetable.Slots.Any(slot =>
+                slot.Subject == subject &&
+                slot.StartTime.Date == slotStartTime.Date);
+        }
+
         private bool ValidateRoomAvailability(List<Subject> subjects, IReadOnlyCollection<Room> rooms)
         {
             var roomTypeDurations = rooms.GroupBy(r => r.Type)
-                .ToDictionary(g => g.Key, g => g.Sum(r => 8 * 5));
+                .ToDictionary(g => g.Key, g => g.Sum(r => 8 * 5)); // Assume 8 hours per day for 5 days a week
 
             var subjectRoomRequirements = subjects.GroupBy(s => s.RequiredRoomType)
-                .ToDictionary(g => g.Key, g => g.Sum(s => s.Setting.SpecificStartTimes.Sum(t => t.Value.Count * s.Setting.Duration.TotalHours)));
+                .ToDictionary(g => g.Key, g => g.Sum(s => s.Setting.SpecificStartTimes.Count * s.Setting.Duration.TotalHours));
 
             foreach (var requirement in subjectRoomRequirements)
             {
@@ -145,144 +180,147 @@ namespace TimeTable.Core
                 r.Type == subject.RequiredRoomType && r.Capacity >= subject.RequiredCapacity);
         }
 
-        private Teacher FindAvailableTeacher(Subject subject, List<Teacher> teachers, DayOfWeek day,
-            DateTime slotStartTime, Schedule timetable)
+        private Teacher FindAvailableTeacher(Subject subject, List<Teacher> teachers, DateTime slotStartTime, Schedule timetable)
         {
             return subject.TeacherSubjects.Select(a => a.Teacher).FirstOrDefault(t =>
-                IsTeacherAvailable(t, day, slotStartTime, subject.Setting.Duration) &&
-                !IsTeacherOverlapping(t, day, slotStartTime.TimeOfDay, subject.Setting.Duration, timetable) &&
-                !IsTeacherDuplicate(t, day, slotStartTime.TimeOfDay, timetable));
+                IsTeacherAvailable(t, slotStartTime, subject.Setting.Duration, timetable));
         }
 
-        private bool IsSlotValid(Subject subject, DayOfWeek day, DateTime slotStartTime, DateTime slotEndTime,
-            Schedule timetable)
+        private bool IsRoomAvailable(Room room, DateTime slotStartTime, TimeSpan duration, Schedule timetable)
         {
-            if (day == DayOfWeek.Friday && slotEndTime.TimeOfDay > new TimeSpan(12, 0, 0))
+            var slotEndTime = slotStartTime.Add(duration);
+
+            return !timetable.Slots.Any(slot =>
+                slot.Room == room &&
+                ((slot.StartTime < slotEndTime && slot.StartTime >= slotStartTime) ||
+                 (slot.EndTime > slotStartTime && slot.EndTime <= slotEndTime) ||
+                 (slot.StartTime <= slotStartTime && slot.EndTime >= slotEndTime)));
+        }
+
+        private bool IsTeacherAvailable(Teacher teacher, DateTime slotStartTime, TimeSpan duration, Schedule timetable)
+        {
+            var slotEndTime = slotStartTime.Add(duration);
+
+            return teacher.AvailabilityRules
+                .Where(rule => rule.Day == slotStartTime.DayOfWeek)
+                .All(rule =>
+                {
+                    var ruleStartTime = slotStartTime.Date.Add(rule.StartTime);
+                    var ruleEndTime = slotStartTime.Date.Add(rule.EndTime);
+                    return slotEndTime <= ruleStartTime || slotStartTime >= ruleEndTime;
+                }) &&
+                !timetable.Slots.Any(slot =>
+                    slot.Teacher == teacher &&
+                    ((slot.StartTime < slotEndTime && slot.StartTime >= slotStartTime) ||
+                     (slot.EndTime > slotStartTime && slot.EndTime <= slotEndTime) ||
+                     (slot.StartTime <= slotStartTime && slot.EndTime >= slotEndTime))) &&
+                !timetable.Slots.Any(slot =>
+                    slot.Teacher == teacher && slot.StartTime == slotStartTime);
+        }
+
+        private bool IsSlotValid(Subject subject, DateTime slotStartTime, DateTime slotEndTime, Schedule timetable)
+        {
+            if (slotStartTime.DayOfWeek == DayOfWeek.Friday && slotEndTime.TimeOfDay > new TimeSpan(12, 0, 0))
             {
-                Console.WriteLine(
-                    $"Skipping slot for subject {subject.Name} on {day} at {slotStartTime.TimeOfDay} because it exceeds allowed time.");
                 return false;
             }
 
             if (HasConflicts(timetable, new Slot
             {
                 Subject = subject,
-                Day = (int)day,
                 StartTime = slotStartTime,
                 Duration = subject.Setting.Duration
             }))
             {
-                Console.WriteLine(
-                    $"Skipping slot for subject {subject.Name} on {day} at {slotStartTime.TimeOfDay} due to course conflict.");
                 return false;
             }
 
             return true;
         }
 
-        private void LogSlotAdded(Subject subject, DayOfWeek day, TimeSpan startTime, Teacher teacher, Room room)
+        private bool HasConflicts(Schedule? timetable, Slot mutatedSlot)
         {
-            Console.WriteLine(
-                $"Added slot for subject {subject.Name} on {day} at {startTime} with teacher {teacher.Name} in room {room.Name}.");
-        }
-
-        private void LogNoSuitableRoomOrTeacher(Subject subject, DayOfWeek day, TimeSpan startTime, Room room,
-            Teacher teacher)
-        {
-            Console.WriteLine($"No suitable room or teacher found for subject {subject.Name} on {day} at {startTime}");
-            if (room == null)
-            {
-                Console.WriteLine(
-                    $"No room found with type {subject.RequiredRoomType} and capacity >= {subject.RequiredCapacity}");
-            }
-
-            if (teacher == null)
-            {
-                Console.WriteLine($"No teacher available for subject {subject.Name} at {startTime} on {day}");
-            }
-        }
-
-        private bool IsTeacherOverlapping(Teacher teacher, DayOfWeek day, TimeSpan startTime, TimeSpan duration,
-            Schedule timetable)
-        {
-            var slotStartTime = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek + (int)day).Add(startTime);
-            var slotEndTime = slotStartTime.Add(duration);
-
-            return timetable.Slots.Any(slot =>
-                slot.Teacher == teacher && slot.Day == (int)day &&
-                ((slot.StartTime < slotEndTime && slot.StartTime >= slotStartTime) ||
-                 (slot.EndTime > slotStartTime && slot.EndTime <= slotEndTime) ||
-                 (slot.StartTime <= slotStartTime && slot.EndTime >= slotEndTime)));
-        }
-
-        private bool IsTeacherDuplicate(Teacher teacher, DayOfWeek day, TimeSpan startTime, Schedule timetable)
-        {
-            var slotStartTime = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek + (int)day).Add(startTime);
-
-            return timetable.Slots.Any(slot =>
-                slot.Teacher == teacher && slot.Day == (int)day && slot.StartTime == slotStartTime);
+            if (timetable?.Slots == null) return false;
+            return timetable.Slots.Where(slot => slot != mutatedSlot && slot.StartTime.DayOfWeek == mutatedSlot.StartTime.DayOfWeek).Any(slot =>
+                slot.Teacher == mutatedSlot.Teacher && slot.StartTime < mutatedSlot.EndTime &&
+                slot.EndTime > mutatedSlot.StartTime);
         }
 
         private static void EvaluateFitness(List<Schedule?> population)
         {
             foreach (var timetable in population)
             {
-                var conflicts = 0;
+                if (timetable == null) continue;
 
-                if (timetable != null)
+                var fitness = 0;
+                var slotsByDay = timetable.Slots.GroupBy(slot => slot.StartTime.Date);
+
+                foreach (var dayGroup in slotsByDay)
                 {
-                    var slotsGroupedByDay = timetable.Slots.GroupBy(slot => slot.Day);
+                    var slots = dayGroup.ToList();
 
-                    foreach (var daySlots in slotsGroupedByDay)
+                    // Check for conflicts within the same day
+                    for (var i = 0; i < slots.Count; i++)
                     {
-                        var slotsByTime = daySlots.OrderBy(slot => slot.StartTime).ToList();
-                        for (var i = 0; i < slotsByTime.Count - 1; i++)
+                        for (var j = i + 1; j < slots.Count; j++)
                         {
-                            var currentSlot = slotsByTime[i];
+                            var slotA = slots[i];
+                            var slotB = slots[j];
 
-                            for (var j = i + 1; j < slotsByTime.Count; j++)
+                            // Check for time overlap for the same teacher
+                            if (slotA.Teacher == slotB.Teacher && slotA.StartTime < slotB.EndTime && slotA.EndTime > slotB.StartTime)
                             {
-                                var nextSlot = slotsByTime[j];
+                                fitness -= 10;
+                                Console.WriteLine($"Conflict: Teacher {slotA.Teacher.Name} has overlapping slots on {slotA.StartTime.Date}");
+                            }
 
-                                if (currentSlot.EndTime <= nextSlot.StartTime) continue;
-                                conflicts++;
+                            // Check for time overlap for the same room
+                            if (slotA.Room == slotB.Room && slotA.StartTime < slotB.EndTime && slotA.EndTime > slotB.StartTime)
+                            {
+                                fitness -= 10;
+                                Console.WriteLine($"Conflict: Room {slotA.Room.Name} has overlapping slots on {slotA.StartTime.Date}");
+                            }
 
-                                if (currentSlot.Teacher == nextSlot.Teacher)
-                                {
-                                    conflicts++;
-
-                                    if ((currentSlot.StartTime < nextSlot.EndTime) &&
-                                        (currentSlot.EndTime > nextSlot.StartTime))
-                                    {
-                                        conflicts++;
-                                    }
-
-                                    if (currentSlot.Room != nextSlot.Room)
-                                    {
-                                        conflicts++;
-                                    }
-
-                                    if (currentSlot.StartTime == nextSlot.StartTime &&
-                                        currentSlot.EndTime == nextSlot.EndTime)
-                                    {
-                                        conflicts++;
-                                    }
-                                }
-
-                                if (currentSlot.Room != nextSlot.Room) continue;
-                                conflicts++;
-
-                                if (currentSlot.Teacher != nextSlot.Teacher)
-                                {
-                                    conflicts++;
-                                }
+                            // Check for duplicate subjects on the same day
+                            if (slotA.Subject == slotB.Subject)
+                            {
+                                fitness -= 5;
+                                Console.WriteLine($"Conflict: Subject {slotA.Subject.Name} is duplicated on {slotA.StartTime.Date}");
                             }
                         }
                     }
                 }
 
-                if (timetable != null)
-                    timetable.Fitness = -conflicts; // We want to minimize conflicts, so negative conflicts for fitness
+                // Check for duplicate subjects within the same week
+                var slotsByWeek = timetable.Slots.GroupBy(slot => CultureInfo.InvariantCulture.Calendar.GetWeekOfYear(slot.StartTime, CalendarWeekRule.FirstDay, DayOfWeek.Monday));
+
+                foreach (var weekGroup in slotsByWeek)
+                {
+                    var slots = weekGroup.ToList();
+                    var subjectOccurrences = new Dictionary<int, int>();
+
+                    foreach (var slot in slots)
+                    {
+                        if (subjectOccurrences.ContainsKey(slot.Subject.SubjectId))
+                        {
+                            subjectOccurrences[slot.Subject.SubjectId]++;
+                        }
+                        else
+                        {
+                            subjectOccurrences[slot.Subject.SubjectId] = 1;
+                        }
+
+                        // Penalize for duplicate subjects within the same week
+                        if (subjectOccurrences[slot.Subject.SubjectId] > 1)
+                        {
+                            fitness -= 5;
+                            Console.WriteLine($"Conflict: Subject {slot.Subject.Name} is duplicated in week starting {slot.StartTime.Date}");
+                        }
+                    }
+                }
+
+                timetable.Fitness = fitness;
+                Console.WriteLine($"Timetable Fitness: {fitness}");
             }
         }
 
@@ -304,8 +342,7 @@ namespace TimeTable.Core
                 do
                 {
                     newRoom = rooms[_random.Next(rooms.Count)];
-                } while (newRoom == slot.Room || !IsRoomAvailable(newRoom, (DayOfWeek)slot.Day, slot.StartTime,
-                             slot.Duration, timetable));
+                } while (newRoom == slot.Room || !IsRoomAvailable(newRoom, slot.StartTime, slot.Duration, timetable));
 
                 slot.Room = newRoom;
             }
@@ -321,13 +358,15 @@ namespace TimeTable.Core
             }
             else
             {
-                var availableTimes = slot.Subject.Setting.SpecificStartTimes[slot.Day];
+                var availableTimes = slot.Subject.Setting.SpecificStartTimes;
                 var newStartTime = availableTimes[_random.Next(availableTimes.Count)];
-                slot.StartTime = DateTime.Today.AddDays(-(int)DateTime.Today.DayOfWeek + slot.Day).Add(newStartTime);
+                slot.StartTime = slot.StartTime.Date.Add(newStartTime);
 
-                if (slot.Day == 5 && slot.StartTime.TimeOfDay + slot.Duration > new TimeSpan(12, 0, 0))
+                if (IsCourseDuplicatedInSameWeek(slot.Subject, timetable, slot.StartTime) ||
+                    IsCourseDuplicatedOnSameDay(slot.Subject, timetable, slot.StartTime) ||
+                    slot.StartTime.DayOfWeek == DayOfWeek.Friday && slot.StartTime.TimeOfDay + slot.Duration > new TimeSpan(12, 0, 0))
                 {
-                    slot.StartTime = originalStartTime;
+                    slot.StartTime = originalStartTime; // Revert to original if duplication or other conflict found
                 }
             }
 
@@ -337,14 +376,6 @@ namespace TimeTable.Core
                 slot.Teacher = originalTeacher;
                 slot.StartTime = originalStartTime;
             }
-        }
-
-        private static bool HasConflicts(Schedule? timetable, Slot mutatedSlot)
-        {
-            if (timetable?.Slots == null) return false;
-            return timetable.Slots.Where(slot => slot != mutatedSlot && slot.Day == mutatedSlot.Day).Any(slot =>
-                slot.Teacher == mutatedSlot.Teacher && slot.StartTime < mutatedSlot.EndTime &&
-                slot.EndTime > mutatedSlot.StartTime);
         }
 
         private Schedule Crossover(Schedule parent1, Schedule parent2, List<Student> students)
@@ -361,12 +392,9 @@ namespace TimeTable.Core
             for (var i = crossoverPoint; i < parent2.Slots.Count; i++)
             {
                 var slot = parent2.Slots[i];
-                child.Slots.Add(slot);
-
-                if (HasConflicts(child, slot))
+                if (!HasConflicts(child, slot))
                 {
-                    child.Slots.Remove(slot);
-                    break;
+                    child.Slots.Add(slot);
                 }
             }
 
@@ -432,8 +460,7 @@ namespace TimeTable.Core
 
                 population = newPopulation;
             }
-
-            EvaluateFitness(population);
+            
             var bestTimetable = population.OrderByDescending(t => t.Fitness).First();
 
             SaveTimetable(bestTimetable, dbContext);
@@ -455,12 +482,13 @@ namespace TimeTable.Core
 
             foreach (var slot in timetable.Slots)
             {
+                Console.WriteLine($"Saving Slot: Subject={slot.Subject.Name}, Teacher={slot.Teacher.Name}, Room={slot.Room.Name}, StartTime={slot.StartTime}, Duration={slot.Duration}");
+
                 newTimetable.Slots.Add(new Slot
                 {
                     SubjectId = slot.Subject.SubjectId,
                     RoomId = slot.Room.RoomId,
                     TeacherId = slot.Teacher.TeacherId,
-                    Day = slot.Day,
                     StartTime = slot.StartTime,
                     Duration = slot.Duration
                 });
@@ -476,23 +504,34 @@ namespace TimeTable.Core
 
             Console.WriteLine("Generated Timetable:");
 
-            var sortedSlots = timetable.Slots.OrderBy(slot => slot.Day)
-                .ThenBy(slot => slot.StartTime)
+            var sortedSlots = timetable.Slots.OrderBy(slot => slot.StartTime)
                 .ToList();
 
             foreach (var slot in sortedSlots)
             {
                 Console.WriteLine(
-                    $"Subject: {slot.Subject.Name}, Teacher: {slot.Teacher.Name}, Room: {slot.Room.Name}, Day: {(DayOfWeek)slot.Day}, Start Time: {slot.StartTime.TimeOfDay}, End Time: {slot.EndTime.TimeOfDay}");
+                    $"Subject: {slot.Subject.Name}, Teacher: {slot.Teacher.Name}, Room: {slot.Room.Name}, Start Time: {slot.StartTime}, End Time: {slot.EndTime}");
             }
 
             return timetable;
+        }
+
+        private DayOfWeek? GetOppositeDay(DayOfWeek day)
+        {
+            return day switch
+            {
+                DayOfWeek.Monday => DayOfWeek.Wednesday,
+                DayOfWeek.Tuesday => DayOfWeek.Thursday,
+                DayOfWeek.Wednesday => DayOfWeek.Monday,
+                DayOfWeek.Thursday => DayOfWeek.Tuesday,
+                _ => (DayOfWeek?)null,
+            };
         }
     }
 
     public class Schedule
     {
-        public List<Slot> Slots { get; set; }
+        public List<Slot> Slots { get; set; } = new List<Slot>();
         public int Fitness { get; set; }
     }
 }

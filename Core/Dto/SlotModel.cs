@@ -4,7 +4,6 @@ namespace TimeTable.Core.Dto;
 
 public class SlotModel
 {
-    [Required] public int Day { get; set; }
     [Required] public DateTime StartTime { get; set; }
     public DateTime EndTime => StartTime.Add(Duration);
     [Required] public TimeSpan Duration { get; set; }

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TimeTable.Core.DbContext;
 
@@ -11,9 +12,11 @@ using TimeTable.Core.DbContext;
 namespace TimeTable.Migrations
 {
     [DbContext(typeof(TimeTableContext))]
-    partial class TimeTableContextModelSnapshot : ModelSnapshot
+    [Migration("20240525224457_remove-slot-day")]
+    partial class removeslotday
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -246,10 +249,6 @@ namespace TimeTable.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.HasKey("SettingId");
 
                     b.ToTable("Settings");
@@ -259,15 +258,13 @@ namespace TimeTable.Migrations
                         {
                             SettingId = 1,
                             Duration = new TimeSpan(0, 1, 15, 0, 0),
-                            SpecificStartTimesJson = "[\"08:00:00\",\"09:30:00\",\"11:00:00\",\"12:30:00\",\"14:00:00\",\"15:30:00\",\"17:00:00\"]",
-                            Type = "2-day"
+                            SpecificStartTimesJson = "{\"1\":[\"08:00:00\",\"09:30:00\",\"11:00:00\",\"12:30:00\",\"14:00:00\",\"15:30:00\",\"17:00:00\"],\"2\":[\"08:00:00\",\"09:30:00\",\"11:00:00\",\"12:30:00\",\"14:00:00\",\"15:30:00\",\"17:00:00\"],\"3\":[\"08:00:00\",\"09:30:00\",\"11:00:00\",\"12:30:00\",\"14:00:00\",\"15:30:00\",\"17:00:00\"],\"4\":[\"08:00:00\",\"09:30:00\",\"11:00:00\",\"12:30:00\",\"14:00:00\",\"15:30:00\",\"17:00:00\"]}"
                         },
                         new
                         {
                             SettingId = 2,
                             Duration = new TimeSpan(0, 2, 15, 0, 0),
-                            SpecificStartTimesJson = "[\"08:00:00\",\"11:00:00\",\"14:00:00\",\"17:00:00\"]",
-                            Type = "1-day"
+                            SpecificStartTimesJson = "{\"1\":[\"08:00:00\",\"11:00:00\",\"14:00:00\",\"17:00:00\"],\"2\":[\"08:00:00\",\"11:00:00\",\"14:00:00\",\"17:00:00\"],\"3\":[\"08:00:00\",\"11:00:00\",\"14:00:00\",\"17:00:00\"],\"4\":[\"08:00:00\",\"11:00:00\",\"14:00:00\",\"17:00:00\"],\"5\":[\"08:00:00\",\"11:00:00\",\"14:00:00\",\"17:00:00\"]}"
                         });
                 });
 
