@@ -17,6 +17,21 @@ public class TimeTableController : ControllerBase
         _dbContext = dbContext;
     }
 
+    [HttpGet("CheckCurrentSemesterTimetable")]
+    public async Task<IActionResult> CheckCurrentSemesterTimetable()
+    {
+        // Get the current semester
+        var currentSemester = await _dbContext.Semesters.FirstOrDefaultAsync(s => s.IsCurrent);
+        if (currentSemester == null)
+            return NotFound("No current semester available.");
+
+        // Check if any timetable exists for the current semester
+        var hasTimetable = await _dbContext.TimeTables
+            .AnyAsync(t => t.SemesterId == currentSemester.SemesterId);
+
+        return Ok(new { HasTimetable = hasTimetable });
+    }
+
     [HttpGet(nameof(GetAllSemesters))]
     public async Task<IEnumerable<SemesterModel>> GetAllSemesters()
     {
@@ -40,9 +55,16 @@ public class TimeTableController : ControllerBase
             return NotFound("No current semester available.");
 
         // Query for the latest timetable within the current semester
-        var query = _dbContext.TimeTables
+        var latestTimetable = await _dbContext.TimeTables
             .Where(t => t.SemesterId == currentSemester.SemesterId)
-            .SelectMany(t => t.Slots)
+            .OrderByDescending(t => t.Date) // Assuming 'Date' indicates when the timetable was generated
+            .FirstOrDefaultAsync();
+
+        if (latestTimetable == null)
+            return NotFound("No timetable found for the current semester.");
+
+        var query = _dbContext.Slots
+            .Where(s => s.TimeTableId == latestTimetable.TimetableId)
             .Include(s => s.Room)
             .Include(s => s.Teacher)
             .Include(s => s.Subject)
@@ -80,7 +102,7 @@ public class TimeTableController : ControllerBase
     {
         var timetable = await _dbContext.TimeTables
             .Include(t => t.Slots)
-            .ThenInclude(s => s.Subject)
+            .ThenInclude(s => s.Subject).ThenInclude(subject => subject.Setting)
             .Include(t => t.Slots)
             .ThenInclude(s => s.Teacher)
             .Include(t => t.Slots)
@@ -103,6 +125,7 @@ public class TimeTableController : ControllerBase
         worksheet.Cells[1, 3].Value = "Room";
         worksheet.Cells[1, 4].Value = "Subject";
         worksheet.Cells[1, 5].Value = "Teacher";
+        worksheet.Cells[1, 6].Value = "Type";
 
         var row = 2;
         foreach (var slot in timetable.Slots)
@@ -112,6 +135,7 @@ public class TimeTableController : ControllerBase
             worksheet.Cells[row, 3].Value = slot.Room.Name;
             worksheet.Cells[row, 4].Value = slot.Subject.Name;
             worksheet.Cells[row, 5].Value = slot.Teacher.Name;
+            worksheet.Cells[row, 6].Value = slot.Subject.Setting.Type;
 
             // Format the datetime columns
             worksheet.Cells[row, 1].Style.Numberformat.Format = "yyyy-mm-dd hh:mm:ss";

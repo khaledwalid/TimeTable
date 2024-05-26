@@ -6,6 +6,9 @@ C:\Users\Khaled Walid\Desktop\TimeTable\TimeTable.runtimeconfig.json
 C:\Users\Khaled Walid\Desktop\TimeTable\TimeTable.pdb
 C:\Users\Khaled Walid\Desktop\TimeTable\Azure.Core.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\Azure.Identity.dll
+C:\Users\Khaled Walid\Desktop\TimeTable\EPPlus.dll
+C:\Users\Khaled Walid\Desktop\TimeTable\EPPlus.Interfaces.dll
+C:\Users\Khaled Walid\Desktop\TimeTable\EPPlus.System.Drawing.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\Humanizer.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\Microsoft.AspNetCore.OpenApi.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\Microsoft.Bcl.AsyncInterfaces.dll
@@ -24,6 +27,7 @@ C:\Users\Khaled Walid\Desktop\TimeTable\Microsoft.IdentityModel.Logging.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\Microsoft.IdentityModel.Protocols.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\Microsoft.IdentityModel.Tokens.dll
+C:\Users\Khaled Walid\Desktop\TimeTable\Microsoft.IO.RecyclableMemoryStream.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\Microsoft.OpenApi.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\Microsoft.SqlServer.Server.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\Microsoft.Win32.SystemEvents.dll
@@ -38,6 +42,7 @@ C:\Users\Khaled Walid\Desktop\TimeTable\System.Drawing.Common.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\System.IdentityModel.Tokens.Jwt.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\System.Memory.Data.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\System.Runtime.Caching.dll
+C:\Users\Khaled Walid\Desktop\TimeTable\System.Security.Cryptography.Pkcs.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\System.Security.Cryptography.ProtectedData.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\System.Security.Permissions.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\System.Windows.Extensions.dll
@@ -47,9 +52,9 @@ C:\Users\Khaled Walid\Desktop\TimeTable\runtimes\win-arm\native\Microsoft.Data.S
 C:\Users\Khaled Walid\Desktop\TimeTable\runtimes\win-arm64\native\Microsoft.Data.SqlClient.SNI.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\runtimes\win-x86\native\Microsoft.Data.SqlClient.SNI.dll
-C:\Users\Khaled Walid\Desktop\TimeTable\runtimes\win\lib\netcoreapp3.0\Microsoft.Win32.SystemEvents.dll
-C:\Users\Khaled Walid\Desktop\TimeTable\runtimes\unix\lib\netcoreapp3.0\System.Drawing.Common.dll
-C:\Users\Khaled Walid\Desktop\TimeTable\runtimes\win\lib\netcoreapp3.0\System.Drawing.Common.dll
+C:\Users\Khaled Walid\Desktop\TimeTable\runtimes\win\lib\net7.0\Microsoft.Win32.SystemEvents.dll
+C:\Users\Khaled Walid\Desktop\TimeTable\runtimes\win\lib\net7.0\System.Drawing.Common.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\runtimes\win\lib\netstandard2.0\System.Runtime.Caching.dll
+C:\Users\Khaled Walid\Desktop\TimeTable\runtimes\win\lib\net7.0\System.Security.Cryptography.Pkcs.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\runtimes\win\lib\netstandard2.0\System.Security.Cryptography.ProtectedData.dll
 C:\Users\Khaled Walid\Desktop\TimeTable\runtimes\win\lib\netcoreapp3.0\System.Windows.Extensions.dll

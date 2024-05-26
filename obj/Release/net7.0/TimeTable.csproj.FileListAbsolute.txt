@@ -46,9 +46,6 @@ D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\runtimes\win-arm\native\Micro
 D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\runtimes\win-arm64\native\Microsoft.Data.SqlClient.SNI.dll
 D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\runtimes\win-x64\native\Microsoft.Data.SqlClient.SNI.dll
 D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\runtimes\win-x86\native\Microsoft.Data.SqlClient.SNI.dll
-D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\runtimes\win\lib\netcoreapp3.0\Microsoft.Win32.SystemEvents.dll
-D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\runtimes\unix\lib\netcoreapp3.0\System.Drawing.Common.dll
-D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\runtimes\win\lib\netcoreapp3.0\System.Drawing.Common.dll
 D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\runtimes\win\lib\netstandard2.0\System.Runtime.Caching.dll
 D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\runtimes\win\lib\netstandard2.0\System.Security.Cryptography.ProtectedData.dll
 D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\runtimes\win\lib\netcoreapp3.0\System.Windows.Extensions.dll
@@ -75,3 +72,11 @@ D:\Projects\TimeTable\TimeTable\obj\Release\net7.0\TimeTable.genruntimeconfig.ca
 D:\Projects\TimeTable\TimeTable\obj\Release\net7.0\ref\TimeTable.dll
 D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\Newtonsoft.Json.dll
 D:\Projects\TimeTable\TimeTable\obj\Release\net7.0\TimeTable.sourcelink.json
+D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\EPPlus.dll
+D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\EPPlus.Interfaces.dll
+D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\EPPlus.System.Drawing.dll
+D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\Microsoft.IO.RecyclableMemoryStream.dll
+D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\System.Security.Cryptography.Pkcs.dll
+D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\runtimes\win\lib\net7.0\Microsoft.Win32.SystemEvents.dll
+D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\runtimes\win\lib\net7.0\System.Drawing.Common.dll
+D:\Projects\TimeTable\TimeTable\bin\Release\net7.0\runtimes\win\lib\net7.0\System.Security.Cryptography.Pkcs.dll
