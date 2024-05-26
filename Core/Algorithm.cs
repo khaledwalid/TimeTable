@@ -1,12 +1,16 @@
-﻿using System.Globalization;
-using TimeTable.Core.DbContext;
+﻿using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using TimeTable.Core.Models;
+using TimeTable.Core.DbContext;
 
 public class TimetableGeneticAlgorithm
 {
     private readonly Random _random = new();
     public Semester Semester { get; set; } = null!;
 
+    // Generate the initial population of timetables
     private List<Schedule?> GenerateInitialPopulation(List<Subject> subjects, List<Room> rooms,
         List<Teacher> teachers, List<Student> students, int populationSize)
     {
@@ -21,52 +25,42 @@ public class TimetableGeneticAlgorithm
         return population;
     }
 
+    // Generate a single maximally populated timetable
     private Schedule GenerateMaximallyPopulatedTimetable(List<Subject> subjects, List<Room> rooms,
         List<Teacher> teachers, List<Student> students)
     {
         var timetable = new Schedule { Slots = new List<Slot>() };
+        var weekSubjectTracker = new Dictionary<int, HashSet<int>>(); // Week number to subjects scheduled in that week
 
-        if (subjects == null || rooms == null || teachers == null || students == null)
-        {
-            throw new ArgumentException("Subjects, rooms, teachers, and students lists cannot be null");
-        }
-
-        ValidateRoomAvailability(subjects, rooms);
-
-        var startOfSemester = Semester.StartDate;
-        var endOfSemester = Semester.EndDate;
-        var subjectSlotCounts = subjects.ToDictionary(s => s.SubjectId, s => 0);
-
-        // Shuffle the subjects to ensure a more random distribution
         subjects = subjects.OrderBy(s => _random.Next()).ToList();
-
-        // Ensure every week within the semester has slots
-        for (var currentDate = startOfSemester; currentDate <= endOfSemester; currentDate = currentDate.AddDays(1))
+        for (var currentDate = Semester.StartDate;
+             currentDate <= Semester.EndDate;
+             currentDate = currentDate.AddDays(1))
         {
             var dayOfWeek = currentDate.DayOfWeek;
-
             if (dayOfWeek != DayOfWeek.Saturday && dayOfWeek != DayOfWeek.Sunday)
             {
+                var weekOfYear = CultureInfo.InvariantCulture.Calendar.GetWeekOfYear(currentDate,
+                    CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+                if (!weekSubjectTracker.ContainsKey(weekOfYear))
+                    weekSubjectTracker[weekOfYear] = new HashSet<int>();
+
                 foreach (var subject in subjects)
                 {
-                    if (!subject.Setting.SpecificStartTimes.Any()) continue;
-
-                    var startTimes = subject.Setting.SpecificStartTimes;
-
-                    foreach (var startTime in startTimes)
+                    foreach (var startTime in subject.Setting.SpecificStartTimes)
                     {
                         var slotStartTime = currentDate.Date.Add(startTime);
                         var slotEndTime = slotStartTime.Add(subject.Setting.Duration);
 
+                        if (subject.Setting.Type == "1-day" &&
+                            weekSubjectTracker[weekOfYear].Contains(subject.SubjectId))
+                            continue; // Skip if already scheduled this week
+
                         if (IsCourseDuplicatedInSameWeek(subject, timetable, slotStartTime))
-                        {
                             continue;
-                        }
 
                         if (IsCourseDuplicatedOnSameDay(subject, timetable, slotStartTime))
-                        {
                             continue;
-                        }
 
                         var room = FindAvailableRoom(subject, rooms);
                         var teacher = FindAvailableTeacher(subject, teachers, slotStartTime, timetable);
@@ -86,53 +80,17 @@ public class TimetableGeneticAlgorithm
                                 };
 
                                 timetable.Slots.Add(slot);
-                                subjectSlotCounts[subject.SubjectId]++;
-
-                                // Handle 2-day courses
-                                if (subject.Setting.Type == "2-day" &&
-                                    (dayOfWeek == DayOfWeek.Monday || dayOfWeek == DayOfWeek.Tuesday))
-                                {
-                                    var oppositeDay = GetOppositeDay(dayOfWeek);
-                                    if (oppositeDay != null)
-                                    {
-                                        var oppositeSlotStartTime =
-                                            slotStartTime.AddDays((int)oppositeDay - (int)dayOfWeek);
-                                        var oppositeSlotEndTime = oppositeSlotStartTime.Add(subject.Setting.Duration);
-
-                                        if (!IsCourseDuplicatedOnSameDay(subject, timetable, oppositeSlotStartTime) &&
-                                            IsRoomAvailable(room, oppositeSlotStartTime, subject.Setting.Duration,
-                                                timetable) &&
-                                            IsTeacherAvailable(teacher, oppositeSlotStartTime, subject.Setting.Duration,
-                                                timetable))
-                                        {
-                                            var oppositeSlot = new Slot
-                                            {
-                                                Subject = subject,
-                                                Room = room,
-                                                Teacher = teacher,
-                                                StartTime = oppositeSlotStartTime,
-                                                Duration = subject.Setting.Duration
-                                            };
-
-                                            timetable.Slots.Add(oppositeSlot);
-                                            subjectSlotCounts[subject.SubjectId]++;
-                                        }
-                                    }
-                                }
+                                weekSubjectTracker[weekOfYear].Add(subject.SubjectId);
                             }
                         }
                     }
                 }
             }
 
-            // Skip to Monday if the current date is Friday
             if (currentDate.DayOfWeek == DayOfWeek.Friday)
-            {
-                currentDate = currentDate.AddDays(2);
-            }
+                currentDate = currentDate.AddDays(2); // Skip to Monday
         }
 
-        Console.WriteLine($"Total slots generated: {timetable.Slots.Count}");
         return timetable;
     }
 

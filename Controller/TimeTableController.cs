@@ -31,26 +31,48 @@ public class TimeTableController : ControllerBase
     }
 
     [HttpGet(nameof(GetLatestTimetable))]
-    public async Task<IEnumerable<SlotModel>?> GetLatestTimetable()
+    public async Task<IActionResult> GetLatestTimetable(int? roomId, int? teacherId, int? subjectId, DateTime? start,
+        DateTime? end)
     {
-        var latestTimetable = await _dbContext.TimeTables
-            .OrderByDescending(t => t.Date)
-            .Include(t => t.Slots)
-            .ThenInclude(s => s.Subject)
-            .ThenInclude(sub => sub.TeacherSubjects)
-            .ThenInclude(ts => ts.Teacher)
-            .Include(t => t.Slots)
-            .ThenInclude(s => s.Room).Include(timeTable => timeTable.Slots).ThenInclude(slot => slot.Teacher)
-            .FirstOrDefaultAsync();
+        // Get the current semester
+        var currentSemester = await _dbContext.Semesters.FirstOrDefaultAsync(s => s.IsCurrent);
+        if (currentSemester == null)
+            return NotFound("No current semester available.");
 
-        return latestTimetable?.Slots.Select(a => new SlotModel
+        // Query for the latest timetable within the current semester
+        var query = _dbContext.TimeTables
+            .Where(t => t.SemesterId == currentSemester.SemesterId)
+            .SelectMany(t => t.Slots)
+            .Include(s => s.Room)
+            .Include(s => s.Teacher)
+            .Include(s => s.Subject)
+            .AsQueryable();
+
+        // Filtering by IDs
+        if (roomId.HasValue)
+            query = query.Where(s => s.RoomId == roomId.Value);
+        if (teacherId.HasValue)
+            query = query.Where(s => s.TeacherId == teacherId.Value);
+        if (subjectId.HasValue)
+            query = query.Where(s => s.SubjectId == subjectId.Value);
+        if (start.HasValue)
+            query = query.Where(s => s.StartTime >= start.Value);
+        if (end.HasValue)
+            query = query.Where(s => s.EndTime <= end.Value);
+
+        var slots = await query.ToListAsync();
+
+        // Map to DTO
+        var result = slots.Select(slot => new SlotModel
         {
-            Teacher = a.Teacher.Name,
-            Duration = a.Duration,
-            StartTime = a.StartTime,
-            Room = a.Room.Name,
-            Subject = a.Subject.Name
+            StartTime = slot.StartTime,
+            Duration = slot.Duration,
+            Teacher = slot.Teacher.Name,
+            Room = slot.Room.Name,
+            Subject = slot.Subject.Name
         });
+
+        return Ok(result);
     }
 
     [HttpGet("ExportSlotsToExcel/{timetableId:int}")]

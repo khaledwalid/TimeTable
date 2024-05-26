@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using TimeTable.Core.DbContext;
 
@@ -11,9 +12,11 @@ using TimeTable.Core.DbContext;
 namespace TimeTable.Migrations
 {
     [DbContext(typeof(TimeTableContext))]
-    partial class TimeTableContextModelSnapshot : ModelSnapshot
+    [Migration("20240526143643_add-current-semester")]
+    partial class addcurrentsemester
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

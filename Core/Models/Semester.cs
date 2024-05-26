@@ -10,7 +10,8 @@ public class Semester
     public int SemesterId { get; set; }
 
     [Required] public string Name { get; set; } = null!;
-
+    // New property to indicate current semester
+    public bool IsCurrent { get; set; }
     [Required] public DateTime StartDate { get; set; }
 
     [Required] public DateTime EndDate { get; set; }
