@@ -1,8 +1,6 @@
-﻿using Microsoft.AspNetCore.Http.HttpResults;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using OfficeOpenXml;
-using TimeTable.Core;
 using TimeTable.Core.DbContext;
 using TimeTable.Core.Dto;
 
@@ -26,7 +24,9 @@ public class TimeTableController : ControllerBase
         return semesters.Select(a => new SemesterModel
         {
             Name = a.Name,
-            Id = a.SemesterId
+            Id = a.SemesterId,
+            StartDate = a.StartDate,
+            EndDate = a.EndDate
         });
     }
 
@@ -53,71 +53,65 @@ public class TimeTableController : ControllerBase
         });
     }
 
-[HttpGet("ExportSlotsToExcel/{timetableId}")]
-        public async Task<IActionResult> ExportSlotsToExcel(int timetableId)
+    [HttpGet("ExportSlotsToExcel/{timetableId:int}")]
+    public async Task<IActionResult> ExportSlotsToExcel(int timetableId)
+    {
+        var timetable = await _dbContext.TimeTables
+            .Include(t => t.Slots)
+            .ThenInclude(s => s.Subject)
+            .Include(t => t.Slots)
+            .ThenInclude(s => s.Teacher)
+            .Include(t => t.Slots)
+            .ThenInclude(s => s.Room)
+            .FirstOrDefaultAsync(t => t.TimetableId == timetableId);
+
+        if (timetable == null)
         {
-            var timetable = await _dbContext.TimeTables
-                .Include(t => t.Slots)
-                .ThenInclude(s => s.Subject)
-                .Include(t => t.Slots)
-                .ThenInclude(s => s.Teacher)
-                .Include(t => t.Slots)
-                .ThenInclude(s => s.Room)
-                .FirstOrDefaultAsync(t => t.TimetableId == timetableId);
-
-            if (timetable == null)
-            {
-                return NotFound();
-            }
-
-            // Set the license context
-            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
-
-            using var package = new ExcelPackage();
-            var worksheet = package.Workbook.Worksheets.Add("Slots");
-
-            worksheet.Cells[1, 1].Value = "Start";
-            worksheet.Cells[1, 2].Value = "End";
-            worksheet.Cells[1, 3].Value = "Room";
-            worksheet.Cells[1, 4].Value = "Subject";
-            worksheet.Cells[1, 5].Value = "Teacher";
-
-            var row = 2;
-            foreach (var slot in timetable.Slots)
-            {
-                worksheet.Cells[row, 1].Value = slot.StartTime;
-                worksheet.Cells[row, 2].Value = slot.EndTime;
-                worksheet.Cells[row, 3].Value = slot.Room.Name;
-                worksheet.Cells[row, 4].Value = slot.Subject.Name;
-                worksheet.Cells[row, 5].Value = slot.Teacher.Name;
-
-                // Format the datetime columns
-                worksheet.Cells[row, 1].Style.Numberformat.Format = "yyyy-mm-dd hh:mm:ss";
-                worksheet.Cells[row, 2].Style.Numberformat.Format = "yyyy-mm-dd hh:mm:ss";
-                
-                row++;
-            }
-
-            var stream = new MemoryStream();
-            package.SaveAs(stream);
-            stream.Position = 0;
-
-            var fileName = $"Timetable_{timetableId}_Slots.xlsx";
-            return File(stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+            return NotFound();
         }
+
+        // Set the license context
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+
+        using var package = new ExcelPackage();
+        var worksheet = package.Workbook.Worksheets.Add("Slots");
+
+        worksheet.Cells[1, 1].Value = "Start";
+        worksheet.Cells[1, 2].Value = "End";
+        worksheet.Cells[1, 3].Value = "Room";
+        worksheet.Cells[1, 4].Value = "Subject";
+        worksheet.Cells[1, 5].Value = "Teacher";
+
+        var row = 2;
+        foreach (var slot in timetable.Slots)
+        {
+            worksheet.Cells[row, 1].Value = slot.StartTime;
+            worksheet.Cells[row, 2].Value = slot.EndTime;
+            worksheet.Cells[row, 3].Value = slot.Room.Name;
+            worksheet.Cells[row, 4].Value = slot.Subject.Name;
+            worksheet.Cells[row, 5].Value = slot.Teacher.Name;
+
+            // Format the datetime columns
+            worksheet.Cells[row, 1].Style.Numberformat.Format = "yyyy-mm-dd hh:mm:ss";
+            worksheet.Cells[row, 2].Style.Numberformat.Format = "yyyy-mm-dd hh:mm:ss";
+
+            row++;
+        }
+
+        var stream = new MemoryStream();
+        package.SaveAs(stream);
+        stream.Position = 0;
+
+        var fileName = $"Timetable_{timetableId}_Slots.xlsx";
+        return File(stream, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+    }
+
     [HttpGet(nameof(Generate))]
-    public async Task<IEnumerable<SlotModel>?> Generate(int semesterId)
+    public async Task<ActionResult<IEnumerable<SlotModel>?>> Generate(int semesterId)
     {
         var semester = await _dbContext.Semesters.FirstOrDefaultAsync(a => a.SemesterId == semesterId);
-        if (semester == null) return null;
-        var ga = new TimetableGeneticAlgorithm
-        {
-            Semester = semester
-        };
-        // Generate initial population
-        const int populationSize = 10;
-        const int numGenerations = 100;
-        const double mutationRate = 0.1;
+        if (semester == null) return BadRequest("Invalid semester ID.");
+
         var subjects = await _dbContext.Subjects
             .Include(a => a.Setting)
             .Include(a => a.Department)
@@ -131,15 +125,36 @@ public class TimeTableController : ControllerBase
             .ToListAsync();
         var teachers = await _dbContext.Teachers.Include(a => a.AvailabilityRules).ToListAsync();
         var students = await _dbContext.Students.ToListAsync();
+        var departments = await _dbContext.Departments.ToListAsync();
+        var colleges = await _dbContext.Colleges.ToListAsync();
+
+        // Validate constraints before running the algorithm
+        var validator = new TimetableValidator();
+        var errors = validator.ValidateConstraints(subjects, rooms, teachers, departments, colleges, semester);
+        if (errors.Any())
+        {
+            return BadRequest(new { Errors = errors });
+        }
+
+        var ga = new TimetableGeneticAlgorithm
+        {
+            Semester = semester
+        };
+
+        const int populationSize = 10;
+        const int numGenerations = 100;
+        const double mutationRate = 0.1;
+
         var timetable = ga.GeneticAlgorithm(subjects, rooms, teachers, students, populationSize, numGenerations,
             mutationRate, _dbContext);
-        return timetable?.Slots.Select(a => new SlotModel
+
+        return Ok(timetable?.Slots.Select(a => new SlotModel
         {
             Teacher = a.Teacher.Name,
             Duration = a.Duration,
             StartTime = a.StartTime,
             Room = a.Room.Name,
             Subject = a.Subject.Name
-        });
+        }));
     }
 }
