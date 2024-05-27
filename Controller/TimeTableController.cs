@@ -67,6 +67,8 @@ public class TimeTableController : ControllerBase
             .Include(s => s.Room)
             .Include(s => s.Teacher)
             .Include(s => s.Subject)
+            .ThenInclude(sub => sub.Department)
+            .ThenInclude(dep => dep.College)
             .AsQueryable();
 
         // Filtering by IDs
@@ -76,6 +78,10 @@ public class TimeTableController : ControllerBase
             query = query.Where(s => s.TeacherId == model.TeacherId.Value);
         if (model.SubjectId.HasValue)
             query = query.Where(s => s.SubjectId == model.SubjectId.Value);
+        if (model.CollegeId.HasValue)
+            query = query.Where(s => s.Subject.Department.CollegeId == model.CollegeId.Value);
+        if (model.DepartmentId.HasValue)
+            query = query.Where(s => s.Subject.DepartmentId == model.DepartmentId.Value);
         if (model.Start.HasValue)
             query = query.Where(s => s.StartTime >= model.Start.Value);
         if (model.End.HasValue)
@@ -90,10 +96,12 @@ public class TimeTableController : ControllerBase
             Duration = slot.Duration,
             Teacher = slot.Teacher.Name,
             Room = slot.Room.Name,
-            Subject = slot.Subject.Name
+            Subject = slot.Subject.Name,
+            Department = slot.Subject.Department.Name,
+            College = slot.Subject.Department.College.Name
         });
 
-        return Ok(result);
+        return Ok(new { Slots = result, TimeTableId = latestTimetable.TimetableId });
     }
 
     [HttpGet("ExportSlotsToExcel/{timetableId:int}")]
@@ -105,7 +113,8 @@ public class TimeTableController : ControllerBase
             .Include(t => t.Slots)
             .ThenInclude(s => s.Teacher)
             .Include(t => t.Slots)
-            .ThenInclude(s => s.Room)
+            .ThenInclude(s => s.Room).Include(timeTable => timeTable.Slots).ThenInclude(slot => slot.Subject)
+            .ThenInclude(subject => subject.Department).ThenInclude(department => department.College)
             .FirstOrDefaultAsync(t => t.TimetableId == timetableId);
 
         if (timetable == null)
@@ -125,6 +134,8 @@ public class TimeTableController : ControllerBase
         worksheet.Cells[1, 4].Value = "Subject";
         worksheet.Cells[1, 5].Value = "Teacher";
         worksheet.Cells[1, 6].Value = "Type";
+        worksheet.Cells[1, 7].Value = "Department";
+        worksheet.Cells[1, 8].Value = "College";
 
         var row = 2;
         foreach (var slot in timetable.Slots)
@@ -135,6 +146,8 @@ public class TimeTableController : ControllerBase
             worksheet.Cells[row, 4].Value = slot.Subject.Name;
             worksheet.Cells[row, 5].Value = slot.Teacher.Name;
             worksheet.Cells[row, 6].Value = slot.Subject.Setting.Type;
+            worksheet.Cells[row, 7].Value = slot.Subject.Department.Name;
+            worksheet.Cells[row, 8].Value = slot.Subject.Department.College.Name;
 
             // Format the datetime columns
             worksheet.Cells[row, 1].Style.Numberformat.Format = "yyyy-mm-dd hh:mm:ss";

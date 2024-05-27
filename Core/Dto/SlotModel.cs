@@ -1,7 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace TimeTable.Core.Dto;
-
 public class SlotModel
 {
     [Required] public DateTime StartTime { get; set; }
@@ -10,4 +8,6 @@ public class SlotModel
     public string Teacher { get; set; }
     public string Room { get; set; }
     public string Subject { get; set; }
+    public string Department { get; set; }
+    public string College { get; set; }
 }
