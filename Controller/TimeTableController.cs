@@ -45,9 +45,8 @@ public class TimeTableController : ControllerBase
         });
     }
 
-    [HttpGet(nameof(GetLatestTimetable))]
-    public async Task<IActionResult> GetLatestTimetable(int? roomId, int? teacherId, int? subjectId, DateTime? start,
-        DateTime? end)
+    [HttpPost(nameof(GetLatestTimetable))]
+    public async Task<IActionResult> GetLatestTimetable(TimeTableRequestModel model)
     {
         // Get the current semester
         var currentSemester = await _dbContext.Semesters.FirstOrDefaultAsync(s => s.IsCurrent);
@@ -71,16 +70,16 @@ public class TimeTableController : ControllerBase
             .AsQueryable();
 
         // Filtering by IDs
-        if (roomId.HasValue)
-            query = query.Where(s => s.RoomId == roomId.Value);
-        if (teacherId.HasValue)
-            query = query.Where(s => s.TeacherId == teacherId.Value);
-        if (subjectId.HasValue)
-            query = query.Where(s => s.SubjectId == subjectId.Value);
-        if (start.HasValue)
-            query = query.Where(s => s.StartTime >= start.Value);
-        if (end.HasValue)
-            query = query.Where(s => s.EndTime <= end.Value);
+        if (model.RoomId.HasValue)
+            query = query.Where(s => s.RoomId == model.RoomId.Value);
+        if (model.TeacherId.HasValue)
+            query = query.Where(s => s.TeacherId == model.TeacherId.Value);
+        if (model.SubjectId.HasValue)
+            query = query.Where(s => s.SubjectId == model.SubjectId.Value);
+        if (model.Start.HasValue)
+            query = query.Where(s => s.StartTime >= model.Start.Value);
+        if (model.End.HasValue)
+            query = query.Where(s => s.EndTime <= model.End.Value);
 
         var slots = await query.ToListAsync();
 

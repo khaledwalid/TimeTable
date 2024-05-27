@@ -148,7 +148,6 @@ public class TimetableGeneticAlgorithm
             slot.StartTime <= weekEnd);
     }
 
-
     private bool IsCourseDuplicatedOnSameDay(Subject subject, Schedule timetable, DateTime slotStartTime)
     {
         return timetable.Slots.Any(slot =>
@@ -342,9 +341,52 @@ public class TimetableGeneticAlgorithm
                 }
             }
 
+            // Validate "2-day" and "1-day" course scheduling
+            var validationErrors = ValidateCourseTypes(timetable);
+            if (validationErrors.Any())
+            {
+                fitness -= validationErrors.Count * 10; // Adjust the penalty as needed
+                foreach (var error in validationErrors)
+                {
+                    Console.WriteLine(error);
+                }
+            }
+
             timetable.Fitness = fitness;
             Console.WriteLine($"Timetable Fitness: {fitness}");
         }
+    }
+
+    private static List<string> ValidateCourseTypes(Schedule timetable)
+    {
+        var errors = new List<string>();
+
+        var groupedBySubject = timetable.Slots.GroupBy(slot => slot.Subject);
+
+        foreach (var group in groupedBySubject)
+        {
+            var subject = group.Key;
+            var slots = group.ToList();
+
+            if (subject.Setting.Type == "2-day")
+            {
+                var days = slots.Select(slot => slot.StartTime.DayOfWeek).Distinct().ToList();
+                if (days.Count != 2)
+                {
+                    errors.Add($"Subject '{subject.Name}' is a 2-day course but is scheduled on {days.Count} days.");
+                }
+            }
+            else if (subject.Setting.Type == "1-day")
+            {
+                var days = slots.Select(slot => slot.StartTime.DayOfWeek).Distinct().ToList();
+                if (days.Count != 1)
+                {
+                    errors.Add($"Subject '{subject.Name}' is a 1-day course but is scheduled on {days.Count} days.");
+                }
+            }
+        }
+
+        return errors;
     }
 
     private void Mutate(Schedule? timetable, IReadOnlyList<Room> rooms, IReadOnlyList<Teacher> teachers,
@@ -552,6 +594,8 @@ public class TimetableGeneticAlgorithm
         {
             DayOfWeek.Monday => DayOfWeek.Wednesday,
             DayOfWeek.Tuesday => DayOfWeek.Thursday,
+            DayOfWeek.Wednesday => DayOfWeek.Monday,
+            DayOfWeek.Thursday => DayOfWeek.Tuesday,
             _ => (DayOfWeek?)null,
         };
     }
